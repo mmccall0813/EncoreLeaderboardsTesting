@@ -1,0 +1,9 @@
+{
+    "include": ["src/**/*"],
+    "compilerOptions": {
+        "outDir": "./out/",
+        "strict": true,
+        "module": "Node16",
+        
+    }
+}

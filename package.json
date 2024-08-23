@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "@tsconfig/node18": "^18.2.4",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "sqlite": "^5.1.1"
+  },
+  "name": "encoreleaderboards",
+  "version": "1.0.0",
+  "main": "out/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsc && node ./out/index.js"
+  },
+  "author": "macro",
+  "license": "ISC",
+  "description": ""
+}

@@ -1,0 +1,12 @@
+{
+    "discord": {
+        "client_id": 0,
+        "client_secret": "",
+        "bot_token": "",
+        "oauth2_url": "",
+        "redirect_uri": "http://localhost:8080/discord-auth/onboarding"
+    },
+    "webserver": {
+        "port": 8080
+    }
+}

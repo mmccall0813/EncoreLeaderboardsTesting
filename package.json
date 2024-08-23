@@ -1,10 +1,12 @@
 {
   "devDependencies": {
     "@tsconfig/node18": "^18.2.4",
+    "@types/node": "^22.5.0",
     "typescript": "^5.5.4"
   },
   "dependencies": {
-    "sqlite": "^5.1.1"
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
   },
   "name": "encoreleaderboards",
   "version": "1.0.0",

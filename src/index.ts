@@ -123,17 +123,50 @@ const LeaderboardSubmission = Record({
 })
 
 app.post("/leaderboards/submit", async (req: Request, res: Response) => {
-	if(!LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
+	if(typeof req.body !== "object" || !LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
 	let data = LeaderboardSubmission.check(req.body);
 	let user = await DBHelper.getUserByAuthKey(data.auth);
 
 	if(!user) return res.sendStatus(403);
+    if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song doesn't have a leaderboard.")
 
 	await DBHelper.removeExistingScore(user.user_id, data.song_hash, data.instrument);
 	
 	const {auth, ...toSubmit} = data;
 	let success = await DBHelper.submitLeaderboardScore(toSubmit, user.user_id);
 	if(success) res.sendStatus(200); else res.sendStatus(520);
+})
+
+const SongSubmission = Record({
+    auth: RString,
+    song_hash: RString,
+    title: RString,
+    artist: RString, 
+    album: RString,
+    charters: RString,
+    source: RString,
+    diff_drums: RNumber,
+    diff_bass: RNumber,
+    diff_guitar: RNumber,
+    diff_vocals: RNumber,
+    diff_plastic_drums: RNumber,
+    diff_plastic_bass: RNumber,
+    diff_plastic_guitar: RNumber,
+    song_length: RNumber
+})
+
+app.post("/leaderboards/create", async (req: Request, res: Response) => {
+    if(typeof req.body !== "object" || !SongSubmission.validate(req.body).success) return res.sendStatus(400);
+    let data = SongSubmission.check(req.body);
+    let user = await DBHelper.getUserByAuthKey(data.auth);
+
+    if(!user) return res.sendStatus(403);
+    if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
+
+    let {auth, ...toSubmit} = data;
+    let success = await DBHelper.createSong(toSubmit);
+
+    if(success) res.sendStatus(200); else res.sendStatus(520);
 })
 
 app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {

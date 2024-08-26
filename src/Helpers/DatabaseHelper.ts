@@ -27,6 +27,23 @@ interface Score extends ScoreSubmission  {
     user_id: number;
 }
 
+interface Song {
+    song_hash: string,
+    title: string,
+    artist: string, 
+    album: string,
+    charters: string,
+    source: string,
+    diff_drums: number,
+    diff_bass: number,
+    diff_guitar: number,
+    diff_vocals: number,
+    diff_plastic_drums: number,
+    diff_plastic_bass: number,
+    diff_plastic_guitar: number,
+    song_length: number
+}
+
 export class DatabaseHelper {
     db: sqlite.Database;
     constructor(){
@@ -59,8 +76,28 @@ export class DatabaseHelper {
                     misses INTEGER,
                     strikes INTEGER,
                     difficulty INTEGER,
-                    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+                    FOREIGN KEY (user_id) REFERENCES Users(user_id),
+                    FOREIGN KEY (song_hash) REFERENCES Songs(song_hash)
                 );
+            `);
+            this.db.run(`
+                CREATE TABLE Songs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    song_hash TEXT,
+                    title TEXT,
+                    artist TEXT,
+                    album TEXT,
+                    charters TEXT,
+                    source TEXT,
+                    diff_drums INTEGER,
+                    diff_bass INTEGER,
+                    diff_guitar INTEGER,
+                    diff_vocals INTEGER,
+                    diff_plastic_drums INTEGER,
+                    diff_plastic_bass INTEGER,
+                    diff_plastic_guitar INTEGER,
+                    song_length INTEGER
+                );    
             `);
             this.db.wait(() => {
                 this.db.run(`
@@ -110,7 +147,7 @@ export class DatabaseHelper {
         return new Promise( (res) => {
             let items: Score[] = [];
             this.db.each(
-                `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? LIMIT 10 OFFSET ?`, 
+                `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? LIMIT 10 OFFSET ? ORDER BY Score DESC`, 
                 [song_hash, instrument, (page - 1) * 10],
                 (err, score: Score) => {
                     items.push(score);
@@ -125,13 +162,24 @@ export class DatabaseHelper {
         return new Promise( (res) => {
             let exists = false;
             this.db.each(
-                `SELECT * FROM Scores WHERE song_hash = ? LIMIT 1`,
+                `SELECT * FROM Songs WHERE song_hash = ?`,
                 [song_hash],
-                (err, score: Score) => {
+                (err) => {
                     exists = true;
                 },
                 () => {
                     res(exists);
+                }
+            )
+        });
+    }
+    createSong(data: Song): Promise<boolean> {
+        return new Promise( (res) => {
+            this.db.run(
+                `INSERT INTO Songs ("song_hash","title","artist","album","charters","source","diff_drums","diff_bass","diff_guitar","diff_vocals","diff_plastic_drums","diff_plastic_bass","diff_plastic_guitar","song_length") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [data.song_hash, data.title, data.artist, data.album, data.charters, data.source, data.diff_drums, data.diff_bass, data.diff_guitar, data.diff_vocals, data.diff_plastic_drums, data.diff_plastic_bass, data.diff_plastic_guitar, data.song_length],
+                (err) => {
+                    if(!err) res(true); else res(false);
                 }
             )
         })
@@ -156,7 +204,7 @@ export class DatabaseHelper {
     async getUserScoreAndPosition(user_id: number, song_hash: string, instrument: string){
         let songLeaderboard: Score[] = await new Promise( (res) => {
             let lb: Score[] = [];
-            this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ?`,
+            this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY Score DESC`,
                 [song_hash, instrument],
                 (err, score: Score) => {
                     lb.push(score);
@@ -169,7 +217,7 @@ export class DatabaseHelper {
         let pos = songLeaderboard.map( (s) => s.user_id ).indexOf(user_id);
 
         return {
-            pos: pos,
+            pos: pos+1,
             score: songLeaderboard[pos] || null
         }
     }

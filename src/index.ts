@@ -1,4 +1,4 @@
-import { DatabaseHelper, Score } from "./Helpers/DatabaseHelper";
+import { DatabaseHelper } from "./Helpers/DatabaseHelper";
 import express, {Request, Response} from "express";
 import bodyParser from "body-parser";
 import axios from "axios";

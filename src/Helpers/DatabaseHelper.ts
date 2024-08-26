@@ -9,7 +9,7 @@ type User = {
     auth_key: string;
 }
 
-export type Score = {
+type Score = {
     playthrough_id: string;
     user_id: number;
     song_hash: string;

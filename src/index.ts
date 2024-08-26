@@ -123,7 +123,7 @@ const LeaderboardSubmission = Record({
 })
 
 app.post("/leaderboards/submit", async (req: Request, res: Response) => {
-	if(!LeaderboardSubmission.validate(req.body)) return res.sendStatus(400);
+	if(!LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
 	let data = LeaderboardSubmission.check(req.body);
 	let user = await DBHelper.getUserByAuthKey(data.auth);
 
@@ -139,7 +139,7 @@ app.post("/leaderboards/submit", async (req: Request, res: Response) => {
 app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {
 	let hash = req.params.hash as string;
 	let auth = req.query.auth as string;
-	let instrument = req.query.instument as string;
+	let instrument = req.query.instrument as string;
 	if(!hash || !auth || !instrument) return res.sendStatus(400);
 
 	let user = await DBHelper.getUserByAuthKey(auth);

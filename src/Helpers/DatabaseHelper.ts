@@ -157,6 +157,7 @@ export class DatabaseHelper {
         let songLeaderboard: Score[] = await new Promise( (res) => {
             let lb: Score[] = [];
             this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ?`,
+                [song_hash, instrument],
                 (err, score: Score) => {
                     lb.push(score);
                 },

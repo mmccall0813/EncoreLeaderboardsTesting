@@ -4,7 +4,7 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
-import RunTypes from "runtypes";
+import {Record, String as RString, Number as RNumber} from "runtypes";
 
 const DBHelper = new DatabaseHelper();
 const app = express();
@@ -109,17 +109,17 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
     doesLeaderboardExist ? res.json(toSend) : res.status(404).send("Song doesn't have any leaderboards.");
 });
 
-const LeaderboardSubmission = RunTypes.Record({
-	auth: RunTypes.String,
-	song_hash: RunTypes.String,
-	score: RunTypes.Number,
-	note_count: RunTypes.Number,
-	notes_hit_perfect: RunTypes.Number,
-	notes_hit_good: RunTypes.Number,
-	misses: RunTypes.Number,
-	strikes: RunTypes.Number,
-	instrument: RunTypes.String,
-	difficulty: RunTypes.Number
+const LeaderboardSubmission = Record({
+	auth: RString,
+	song_hash: RString,
+	score: RNumber,
+	note_count: RNumber,
+	notes_hit_perfect: RNumber,
+	notes_hit_good: RNumber,
+	misses: RNumber,
+	strikes: RNumber,
+	instrument: RString,
+	difficulty: RNumber
 })
 
 app.post("/leaderboards/submit", async (req: Request, res: Response) => {

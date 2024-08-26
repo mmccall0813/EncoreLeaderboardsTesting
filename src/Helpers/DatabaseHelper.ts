@@ -1,5 +1,6 @@
 import sqlite from "sqlite3";
 import fs from "node:fs";
+import crypto from "node:crypto";
 
 type User = {
     user_id: number;
@@ -9,9 +10,7 @@ type User = {
     auth_key: string;
 }
 
-type Score = {
-    playthrough_id: string;
-    user_id: number;
+interface ScoreSubmission {
     song_hash: string;
     instrument: string;
     score: number;
@@ -21,6 +20,11 @@ type Score = {
     misses: number;
     strikes: number;
     difficulty: number;
+}
+
+interface Score extends ScoreSubmission  {
+    playthrough_id: string;
+    user_id: number;
 }
 
 export class DatabaseHelper {
@@ -131,5 +135,41 @@ export class DatabaseHelper {
                 }
             )
         })
+    }
+    submitLeaderboardScore(data: ScoreSubmission, user_id: number): Promise<boolean> {
+        let uuid = crypto.randomUUID();
+        return new Promise( (res) => {
+            this.db.run(`INSERT INTO Scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                [uuid, user_id, data.song_hash, data.instrument, data.score, data.note_count, data.notes_hit_perfect, data.notes_hit_good, data.misses, data.strikes, data.difficulty],
+                (err) => {if(err) res(false); else res(true);}
+            )
+        })
+    }
+    removeExistingScore(user_id: number, song_hash: string, instrument: string): Promise<boolean> {
+        return new Promise( (res) => {
+            this.db.run(`DELETE FROM Scores WHERE user_id = ? AND song_hash = ? AND instrument = ?`,
+                [user_id, song_hash, instrument],
+                (err) => {if(err) res(false); else res(true);}
+            );
+        })
+    }
+    async getUserScoreAndPosition(user_id: number, song_hash: string, instrument: string){
+        let songLeaderboard: Score[] = await new Promise( (res) => {
+            let lb: Score[] = [];
+            this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ?`,
+                (err, score: Score) => {
+                    lb.push(score);
+                },
+                () => {
+                    res(lb);
+                }
+            )
+        });
+        let pos = songLeaderboard.map( (s) => s.user_id ).indexOf(user_id);
+
+        return {
+            pos: pos,
+            score: songLeaderboard[pos] || null
+        }
     }
 }

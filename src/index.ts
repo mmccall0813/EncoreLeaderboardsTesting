@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
+import RunTypes from "runtypes";
 
 const DBHelper = new DatabaseHelper();
 const app = express();
@@ -27,7 +28,6 @@ app.get("/discord-auth/onboarding", async (req: Request, res: Response) => {
     try { 
         tokenReq = await axios.post(apiUrl + "/token", params);
     } catch(err){
-		console.log(err);
         return res.status(403).end(); // something went wrong
     }
 	let tokenData : {access_token: string, token_type: StringConstructor, expires_in: number, refresh_token: string, scope: string} = tokenReq.data;
@@ -70,8 +70,8 @@ type apiScore = {
     }
 }
 
-app.get("/leaderboards/song/*", async (req: Request, res: Response) => {
-    let hash = req.params[0];
+app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
+    let hash = req.params.hash;
     let instrument = req.query["instrument"] as string;
     let page = parseInt( req.query["page"] as string || "1" );
 
@@ -106,9 +106,72 @@ app.get("/leaderboards/song/*", async (req: Request, res: Response) => {
         } as apiScore;
     }));
 
-    doesLeaderboardExist ? res.json(toSend) : res.status(404).send("Song doesn't have any leaderboards...");
+    doesLeaderboardExist ? res.json(toSend) : res.status(404).send("Song doesn't have any leaderboards.");
+});
+
+const LeaderboardSubmission = RunTypes.Record({
+	auth: RunTypes.String,
+	song_hash: RunTypes.String,
+	score: RunTypes.Number,
+	note_count: RunTypes.Number,
+	notes_hit_perfect: RunTypes.Number,
+	notes_hit_good: RunTypes.Number,
+	misses: RunTypes.Number,
+	strikes: RunTypes.Number,
+	instrument: RunTypes.String,
+	difficulty: RunTypes.Number
+})
+
+app.post("/leaderboards/submit", async (req: Request, res: Response) => {
+	if(!LeaderboardSubmission.validate(req.body)) return res.sendStatus(400);
+	let data = LeaderboardSubmission.check(req.body);
+	let user = await DBHelper.getUserByAuthKey(data.auth);
+
+	if(!user) return res.sendStatus(403);
+
+	await DBHelper.removeExistingScore(user.user_id, data.song_hash, data.instrument);
+	
+	const {auth, ...toSubmit} = data;
+	let success = await DBHelper.submitLeaderboardScore(toSubmit, user.user_id);
+	if(success) res.sendStatus(200); else res.sendStatus(520);
+})
+
+app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {
+	let hash = req.params.hash as string;
+	let auth = req.query.auth as string;
+	let instrument = req.query.instument as string;
+	if(!hash || !auth || !instrument) return res.sendStatus(400);
+
+	let user = await DBHelper.getUserByAuthKey(auth);
+	if(!user) return res.sendStatus(403);
+
+	let leaderboardData = await DBHelper.getUserScoreAndPosition(user.user_id, hash, instrument);
+	if(leaderboardData.pos === -1) return res.sendStatus(404);
+	let score = leaderboardData.score;
+
+	res.json({
+		submitter: {
+			display_name: user?.display_name,
+			username: user?.username,
+			discord_id: user?.discord_id
+		},
+		run: {
+			uuid: score.playthrough_id,
+			score: score.score,
+			note_count: score.note_count,
+			notes_hit_good: score.notes_hit_good,
+			notes_hit_perfect: score.notes_hit_perfect,
+			misses: score.misses,
+			strikes: score.strikes,
+			instrument: score.instrument,
+			difficulty: score.difficulty
+		},
+		leaderboard: {
+			position: leaderboardData.pos
+		}
+	});
 })
 
 app.listen(config.webserver.port, () => {
     console.log("Webserver active on port " + config.webserver.port);
-})
+});

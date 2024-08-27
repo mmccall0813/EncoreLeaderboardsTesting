@@ -5,6 +5,7 @@ import axios from "axios";
 import crypto from "node:crypto";
 import { readFileSync } from "node:fs";
 import {Record, String as RString, Number as RNumber} from "runtypes";
+import { LeaderboardBot as DiscordBot } from "./Helpers/DiscordBot";
 
 const DBHelper = new DatabaseHelper();
 const app = express();
@@ -120,7 +121,7 @@ const LeaderboardSubmission = Record({
 	strikes: RNumber,
 	instrument: RString,
 	difficulty: RNumber
-})
+});
 
 app.post("/leaderboards/submit", async (req: Request, res: Response) => {
 	if(typeof req.body !== "object" || !LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
@@ -135,7 +136,7 @@ app.post("/leaderboards/submit", async (req: Request, res: Response) => {
 	const {auth, ...toSubmit} = data;
 	let success = await DBHelper.submitLeaderboardScore(toSubmit, user.user_id);
 	if(success) res.sendStatus(200); else res.sendStatus(520);
-})
+});
 
 const SongSubmission = Record({
     auth: RString,
@@ -153,7 +154,7 @@ const SongSubmission = Record({
     diff_plastic_bass: RNumber,
     diff_plastic_guitar: RNumber,
     song_length: RNumber
-})
+});
 
 app.post("/leaderboards/create", async (req: Request, res: Response) => {
     if(typeof req.body !== "object" || !SongSubmission.validate(req.body).success) return res.sendStatus(400);
@@ -167,7 +168,7 @@ app.post("/leaderboards/create", async (req: Request, res: Response) => {
     let success = await DBHelper.createSong(toSubmit);
 
     if(success) res.sendStatus(200); else res.sendStatus(520);
-})
+});
 
 app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {
 	let hash = req.params.hash as string;
@@ -203,7 +204,10 @@ app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {
 			position: leaderboardData.pos
 		}
 	});
-})
+});
+
+// init discord bot
+const bot = new DiscordBot(config, DBHelper);
 
 app.listen(config.webserver.port, () => {
     console.log("Webserver active on port " + config.webserver.port);

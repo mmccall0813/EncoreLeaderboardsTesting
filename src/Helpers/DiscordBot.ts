@@ -5,7 +5,7 @@ import { join } from "path";
 
 export interface Command {
     data: SlashCommandBuilder
-    exec: (interaction: ChatInputCommandInteraction, client: ExtendedClient) => void | Promise<Message | undefined>
+    exec: (interaction: ChatInputCommandInteraction, client: ExtendedClient) => any
 }
 
 export class ExtendedClient extends Client {

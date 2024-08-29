@@ -9,6 +9,7 @@
     "body-parser": "^1.20.2",
     "discord.js": "^14.15.3",
     "express": "^4.19.2",
+    "fuse.js": "^7.0.0",
     "runtypes": "^6.7.0",
     "sqlite3": "^5.1.7"
   },

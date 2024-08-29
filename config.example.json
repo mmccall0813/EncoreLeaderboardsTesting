@@ -4,7 +4,9 @@
         "client_secret": "",
         "bot_token": "",
         "oauth2_url": "",
-        "redirect_uri": "http://localhost:8080/discord-auth/onboarding"
+        "redirect_uri": "http://localhost:8080/discord-auth/onboarding",
+        "register_commands_globally": true,
+        "command_register_server": ""
     },
     "webserver": {
         "port": 8080

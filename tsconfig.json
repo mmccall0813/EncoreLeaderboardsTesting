@@ -3,7 +3,8 @@
     "compilerOptions": {
         "outDir": "./out/",
         "strict": true,
-        "module": "Node16",
-        
+        "module": "CommonJS",
+        "target": "ESNext",
+        "esModuleInterop": true
     }
 }

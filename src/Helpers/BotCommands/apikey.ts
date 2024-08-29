@@ -1,5 +1,5 @@
 import {SlashCommandBuilder} from '@discordjs/builders';
-import {EmbedBuilder, Interaction, ChatInputCommandInteraction} from 'discord.js';
+import {EmbedBuilder, ChatInputCommandInteraction} from 'discord.js';
 import { ExtendedClient, Command } from '../DiscordBot';
 import crypto from "crypto";
 

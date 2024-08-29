@@ -27,7 +27,7 @@ interface Score extends ScoreSubmission  {
     user_id: number;
 }
 
-interface Song {
+export interface Song {
     song_hash: string,
     title: string,
     artist: string, 
@@ -220,5 +220,15 @@ export class DatabaseHelper {
             pos: pos+1,
             score: songLeaderboard[pos] || null
         }
+    }
+    getAllSongs(): Promise<Song[]> {
+        return new Promise( (res) => {
+            let songs: Song[] = [];
+            this.db.each(`SELECT * FROM Songs`, (err, song: Song) => {
+                songs.push(song);
+            }, () => {
+                res(songs);
+            })
+        })
     }
 }

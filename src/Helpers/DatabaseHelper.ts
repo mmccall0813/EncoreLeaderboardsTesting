@@ -8,6 +8,7 @@ type User = {
     username: string;
     display_name: string;
     auth_key: string;
+    blacklisted: number;
 }
 
 interface ScoreSubmission {
@@ -60,7 +61,8 @@ export class DatabaseHelper {
                     discord_id TEXT UNIQUE NOT NULL,
                     username TEXT NOT NULL,
                     display_name TEXT,
-                    auth_key TEXT
+                    auth_key TEXT,
+                    blacklisted INTEGER DEFAULT 0
                 );
             `);
             this.db.run(`

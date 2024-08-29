@@ -80,6 +80,9 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
     if(!instrument) return res.status(400).send(`No instrument parameter found.`);
 
     let doesLeaderboardExist = await DBHelper.doesSongHaveLeaderboard(hash);
+
+    if(!doesLeaderboardExist) return res.status(404).send("Song hash doesn't have a leaderboard associated with it");
+
     let data = await DBHelper.getLeaderboard(hash, instrument, page);
 
     let toSend = await Promise.all(data.map( async (score, index) => {
@@ -107,7 +110,7 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
         } as apiScore;
     }));
 
-    doesLeaderboardExist ? res.json(toSend) : res.status(404).send("Song doesn't have any leaderboards.");
+    res.json(toSend);
 });
 
 const LeaderboardSubmission = Record({
@@ -128,8 +131,8 @@ app.post("/leaderboards/submit", async (req: Request, res: Response) => {
 	let data = LeaderboardSubmission.check(req.body);
 	let user = await DBHelper.getUserByAuthKey(data.auth);
 
-	if(!user) return res.sendStatus(403);
-    if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song doesn't have a leaderboard.")
+	if(!user || user.blacklisted === 1) return res.sendStatus(403);
+    if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
 
 	await DBHelper.removeExistingScore(user.user_id, data.song_hash, data.instrument);
 	
@@ -161,7 +164,7 @@ app.post("/leaderboards/create", async (req: Request, res: Response) => {
     let data = SongSubmission.check(req.body);
     let user = await DBHelper.getUserByAuthKey(data.auth);
 
-    if(!user) return res.sendStatus(403);
+    if(!user || user.blacklisted === 1) return res.sendStatus(403);
     if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
 
     let {auth, ...toSubmit} = data;

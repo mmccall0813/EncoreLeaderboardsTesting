@@ -66,12 +66,12 @@ export class LeaderboardBot {
 
         const rest = new REST( {version: "10"} ).setToken(this.config.discord.bot_token);
 
-        this.config.register_commands_globally ?
+        this.config.discord.register_commands_globally ?
         rest.put(Routes.applicationCommands(this.config.discord.client_id), {body: commandData}).then( (res) => {
             console.log("Bot commands registered successfully!");
         }) 
         :
-        rest.put(Routes.applicationGuildCommands(this.config.discord.client_id, this.config.command_register_server), {body: commandData}).then( (res) => {
+        rest.put(Routes.applicationGuildCommands(this.config.discord.client_id, this.config.discord.command_register_server), {body: commandData}).then( (res) => {
             console.log("Bot commands registered successfully!");
         })
     }

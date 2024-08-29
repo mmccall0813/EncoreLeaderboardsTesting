@@ -3,13 +3,15 @@ import express, {Request, Response} from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {Record, String as RString, Number as RNumber} from "runtypes";
 import { LeaderboardBot as DiscordBot } from "./Helpers/DiscordBot";
 
 const DBHelper = new DatabaseHelper();
 const app = express();
 const config = JSON.parse(readFileSync("./config.json").toString());
+
+const blacklist = (existsSync("./blacklist.txt") ? readFileSync("./blacklist.txt").toString().split("\n") : []);
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -131,7 +133,8 @@ app.post("/leaderboards/submit", async (req: Request, res: Response) => {
 	let data = LeaderboardSubmission.check(req.body);
 	let user = await DBHelper.getUserByAuthKey(data.auth);
 
-	if(!user || user.blacklisted === 1) return res.sendStatus(403);
+    if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
+	if(!user || user.blacklisted === 1) return res.sendStatus(401);
     if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
 
 	await DBHelper.removeExistingScore(user.user_id, data.song_hash, data.instrument);
@@ -164,7 +167,8 @@ app.post("/leaderboards/create", async (req: Request, res: Response) => {
     let data = SongSubmission.check(req.body);
     let user = await DBHelper.getUserByAuthKey(data.auth);
 
-    if(!user || user.blacklisted === 1) return res.sendStatus(403);
+    if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
+    if(!user || user.blacklisted === 1) return res.sendStatus(401);
     if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
 
     let {auth, ...toSubmit} = data;

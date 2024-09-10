@@ -1,5 +1,5 @@
-import { DatabaseHelper } from "./Helpers/DatabaseHelper";
-import express, {Request, Response} from "express";
+import { DatabaseHelper, User } from "./Helpers/DatabaseHelper";
+import express, {NextFunction, Request, RequestHandler, Response} from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
 import crypto from "node:crypto";
@@ -12,6 +12,23 @@ const app = express();
 const config = JSON.parse(readFileSync("./config.json").toString());
 
 const blacklist = (existsSync("./blacklist.txt") ? readFileSync("./blacklist.txt").toString().split("\n") : []);
+
+interface AuthorizedRequest extends Request {
+    user?: User;
+}
+
+const requireAuthentication: RequestHandler = async (req: AuthorizedRequest, res: Response, next: NextFunction) => {
+    let apikey = req.headers?.authorization;
+    if(!apikey) return res.status(400).send("Missing authorization header. (must be your API key encoded in base64)");
+    
+    let decoded = Buffer.from(apikey, "base64").toString();
+    let user = await DBHelper.getUserByAuthKey(decoded);
+
+    if(!user) return res.status(401).send("Invalid authorization header. (must be a valid API key encoded in base64)");
+    req.user = user;
+
+    next();
+}
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -116,7 +133,6 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
 });
 
 const LeaderboardSubmission = Record({
-	auth: RString,
 	song_hash: RString,
 	score: RNumber,
 	note_count: RNumber,
@@ -128,24 +144,22 @@ const LeaderboardSubmission = Record({
 	difficulty: RNumber
 });
 
-app.post("/leaderboards/submit", async (req: Request, res: Response) => {
+app.post("/leaderboards/submit", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
 	if(typeof req.body !== "object" || !LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
 	let data = LeaderboardSubmission.check(req.body);
-	let user = await DBHelper.getUserByAuthKey(data.auth);
 
     if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
-	if(!user || user.blacklisted === 1) return res.sendStatus(401);
+	if(!req.user || req.user.blacklisted === 1) return res.sendStatus(401);
     if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
 
-	await DBHelper.removeExistingScore(user.user_id, data.song_hash, data.instrument);
+	await DBHelper.removeExistingScore(req.user.user_id, data.song_hash, data.instrument);
 	
-	const {auth, ...toSubmit} = data;
-	let success = await DBHelper.submitLeaderboardScore(toSubmit, user.user_id);
+	const toSubmit = data;
+	let success = await DBHelper.submitLeaderboardScore(toSubmit, req.user.user_id);
 	if(success) res.sendStatus(200); else res.sendStatus(520);
 });
 
 const SongSubmission = Record({
-    auth: RString,
     song_hash: RString,
     title: RString,
     artist: RString, 
@@ -162,39 +176,34 @@ const SongSubmission = Record({
     song_length: RNumber
 });
 
-app.post("/leaderboards/create", async (req: Request, res: Response) => {
+app.post("/leaderboards/create", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
     if(typeof req.body !== "object" || !SongSubmission.validate(req.body).success) return res.sendStatus(400);
     let data = SongSubmission.check(req.body);
-    let user = await DBHelper.getUserByAuthKey(data.auth);
 
     if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
-    if(!user || user.blacklisted === 1) return res.sendStatus(401);
+    if(!req.user || req.user.blacklisted === 1) return res.sendStatus(401);
     if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
 
-    let {auth, ...toSubmit} = data;
+    let toSubmit = data;
     let success = await DBHelper.createSong(toSubmit);
 
     if(success) res.sendStatus(200); else res.sendStatus(520);
 });
 
-app.get("/leaderboards/me/:hash", async (req: Request, res: Response) => {
+app.get("/leaderboards/song/:hash/me", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
 	let hash = req.params.hash as string;
-	let auth = req.query.auth as string;
 	let instrument = req.query.instrument as string;
-	if(!hash || !auth || !instrument) return res.sendStatus(400);
+	if(!hash || !req.user || !instrument) return res.sendStatus(400);
 
-	let user = await DBHelper.getUserByAuthKey(auth);
-	if(!user) return res.sendStatus(403);
-
-	let leaderboardData = await DBHelper.getUserScoreAndPosition(user.user_id, hash, instrument);
+	let leaderboardData = await DBHelper.getUserScoreAndPosition(req.user.user_id, hash, instrument);
 	if(leaderboardData.pos === -1) return res.sendStatus(404);
 	let score = leaderboardData.score;
 
 	res.json({
 		submitter: {
-			display_name: user?.display_name,
-			username: user?.username,
-			discord_id: user?.discord_id
+			display_name: req.user?.display_name,
+			username: req.user?.username,
+			discord_id: req.user?.discord_id
 		},
 		run: {
 			uuid: score.playthrough_id,

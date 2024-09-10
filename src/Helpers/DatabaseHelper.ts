@@ -2,7 +2,7 @@ import sqlite from "sqlite3";
 import fs from "node:fs";
 import crypto from "node:crypto";
 
-type User = {
+export type User = {
     user_id: number;
     discord_id: string;
     username: string;

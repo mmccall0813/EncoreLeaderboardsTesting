@@ -1,4 +1,4 @@
-import { DatabaseHelper, User } from "./Helpers/DatabaseHelper";
+import { DatabaseHelper, ScoreSubmission, User } from "./Helpers/DatabaseHelper";
 import express, {NextFunction, Request, RequestHandler, Response} from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
@@ -25,6 +25,7 @@ const requireAuthentication: RequestHandler = async (req: AuthorizedRequest, res
     let user = await DBHelper.getUserByAuthKey(decoded);
 
     if(!user) return res.status(401).send("Invalid authorization header. (must be a valid API key encoded in base64)");
+    if(user.blacklisted === 1) return res.status(403).send("You are blacklisted from making requests to this API.");
     req.user = user;
 
     next();
@@ -133,7 +134,6 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
 });
 
 const LeaderboardSubmission = Record({
-	song_hash: RString,
 	score: RNumber,
 	note_count: RNumber,
 	notes_hit_perfect: RNumber,
@@ -144,17 +144,18 @@ const LeaderboardSubmission = Record({
 	difficulty: RNumber
 });
 
-app.post("/leaderboards/submit", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
+app.post("/leaderboards/song/:hash/submit", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
 	if(typeof req.body !== "object" || !LeaderboardSubmission.validate(req.body).success) return res.sendStatus(400);
 	let data = LeaderboardSubmission.check(req.body);
+    let hash = req.params.hash;
 
-    if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
+    if(blacklist.includes(hash)) return res.sendStatus(403);
 	if(!req.user || req.user.blacklisted === 1) return res.sendStatus(401);
-    if(!await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
+    if(!await DBHelper.doesSongHaveLeaderboard(hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
 
-	await DBHelper.removeExistingScore(req.user.user_id, data.song_hash, data.instrument);
+	await DBHelper.removeExistingScore(req.user.user_id, hash, data.instrument);
 	
-	const toSubmit = data;
+	let toSubmit: ScoreSubmission = {...data, song_hash: hash};
 	let success = await DBHelper.submitLeaderboardScore(toSubmit, req.user.user_id);
 	if(success) res.sendStatus(200); else res.sendStatus(520);
 });
@@ -180,8 +181,8 @@ app.post("/leaderboards/create", requireAuthentication, async (req: AuthorizedRe
     if(typeof req.body !== "object" || !SongSubmission.validate(req.body).success) return res.sendStatus(400);
     let data = SongSubmission.check(req.body);
 
-    if(blacklist.includes(data.song_hash)) return res.sendStatus(403);
-    if(!req.user || req.user.blacklisted === 1) return res.sendStatus(401);
+    if(blacklist.includes(data.song_hash)) return res.status(403).send("That song is blacklisted.");
+    if(!req.user) return res.sendStatus(400);
     if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
 
     let toSubmit = data;
@@ -223,7 +224,7 @@ app.get("/leaderboards/song/:hash/me", requireAuthentication, async (req: Author
 });
 
 // init discord bot
-const bot = new DiscordBot(config, DBHelper);
+const bot = config.discord.bot_token !== "" ? new DiscordBot(config, DBHelper) : undefined;
 
 app.listen(config.webserver.port, () => {
     console.log("Webserver active on port " + config.webserver.port);

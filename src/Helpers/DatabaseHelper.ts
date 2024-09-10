@@ -11,7 +11,7 @@ export type User = {
     blacklisted: number;
 }
 
-interface ScoreSubmission {
+export interface ScoreSubmission {
     song_hash: string;
     instrument: string;
     score: number;

@@ -145,11 +145,11 @@ export class DatabaseHelper {
             })
         })
     }
-    getLeaderboard(song_hash: string, instrument: string, page = 1): Promise<Score[]> {
+    getScores(song_hash: string, instrument: string, page = 1): Promise<Score[]> {
         return new Promise( (res) => {
             let items: Score[] = [];
             this.db.each(
-                `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? LIMIT 10 OFFSET ? ORDER BY Score DESC`, 
+                `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY score DESC LIMIT 10 OFFSET ?`, 
                 [song_hash, instrument, (page - 1) * 10],
                 (err, score: Score) => {
                     items.push(score);
@@ -160,11 +160,26 @@ export class DatabaseHelper {
             )
         });
     }
-    doesSongHaveLeaderboard(song_hash: string): Promise<boolean> {
+    getScoreCount(song_hash: string, instrument: string): Promise<number> {
+        return new Promise( (res) => {
+            let total = 0;
+            this.db.each(
+                `SELECT NULL FROM Scores WHERE song_hash = ? AND instrument = ?`,
+                [song_hash, instrument],
+                (err) => {
+                    total++;
+                },
+                () => {
+                    res(total);
+                }
+            )
+        })
+    }
+    doesSongExist(song_hash: string): Promise<boolean> {
         return new Promise( (res) => {
             let exists = false;
             this.db.each(
-                `SELECT * FROM Songs WHERE song_hash = ?`,
+                `SELECT NULL FROM Songs WHERE song_hash = ?`,
                 [song_hash],
                 (err) => {
                     exists = true;

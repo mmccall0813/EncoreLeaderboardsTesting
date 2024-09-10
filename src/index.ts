@@ -21,7 +21,7 @@ const requireAuthentication: RequestHandler = async (req: AuthorizedRequest, res
     let apikey = req.headers?.authorization;
     if(!apikey) return res.status(400).send("Missing authorization header. (must be your API key encoded in base64)");
     
-    let decoded = Buffer.from(apikey, "base64").toString();
+    let decoded = Buffer.from(apikey.replace("Bearer  ", ""), "base64").toString();
     let user = await DBHelper.getUserByAuthKey(decoded);
 
     if(!user) return res.status(401).send("Invalid authorization header. (must be a valid API key encoded in base64)");
@@ -99,36 +99,44 @@ app.get("/leaderboards/song/:hash", async (req: Request, res: Response) => {
     if(Number.isNaN(page) || page <= 0) return res.status(400).send(`Invalid page parameter. (must be greater than 0, got ${page})`);
     if(!instrument) return res.status(400).send(`No instrument parameter found.`);
 
-    let doesLeaderboardExist = await DBHelper.doesSongHaveLeaderboard(hash);
+    let doesSongExist = await DBHelper.doesSongExist(hash);
 
-    if(!doesLeaderboardExist) return res.status(404).send("Song hash doesn't have a leaderboard associated with it");
+    if(!doesSongExist) return res.status(404).send("Song hash doesn't have a leaderboard associated with it");
 
-    let data = await DBHelper.getLeaderboard(hash, instrument, page);
+    let data = await DBHelper.getScores(hash, instrument, page);
+    let totalScores = await DBHelper.getScoreCount(hash, instrument);
 
-    let toSend = await Promise.all(data.map( async (score, index) => {
-        let user = await DBHelper.getUserByUserId(score.user_id);
-        return {
-            submitter: {
-                display_name: user?.display_name,
-                username: user?.username,
-                discord_id: user?.discord_id
-            },
-            run: {
-                uuid: score.playthrough_id,
-                score: score.score,
-                note_count: score.note_count,
-                notes_hit_good: score.notes_hit_good,
-                notes_hit_perfect: score.notes_hit_perfect,
-                misses: score.misses,
-                strikes: score.strikes,
-                instrument: score.instrument,
-                difficulty: score.difficulty
-            },
-            leaderboard: {
-                position: ((page - 1) * 10) + index + 1
-            }
-        } as apiScore;
-    }));
+    let toSend = {
+        scores: await Promise.all(data.map( async (score, index) => {
+            let user = await DBHelper.getUserByUserId(score.user_id);
+            return {
+                submitter: {
+                    display_name: user?.display_name,
+                    username: user?.username,
+                    discord_id: user?.discord_id
+                },
+                run: {
+                    uuid: score.playthrough_id,
+                    score: score.score,
+                    note_count: score.note_count,
+                    notes_hit_good: score.notes_hit_good,
+                    notes_hit_perfect: score.notes_hit_perfect,
+                    misses: score.misses,
+                    strikes: score.strikes,
+                    instrument: score.instrument,
+                    difficulty: score.difficulty
+                },
+                leaderboard: {
+                    position: ((page - 1) * 10) + index + 1
+                }
+            } as apiScore;
+        })),
+        context: {
+            current_page: page,
+            total_pages: Math.ceil(totalScores / 10),
+            total_scores: totalScores
+        }
+    };
 
     res.json(toSend);
 });
@@ -151,7 +159,7 @@ app.post("/leaderboards/song/:hash/submit", requireAuthentication, async (req: A
 
     if(blacklist.includes(hash)) return res.sendStatus(403);
 	if(!req.user || req.user.blacklisted === 1) return res.sendStatus(401);
-    if(!await DBHelper.doesSongHaveLeaderboard(hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
+    if(!await DBHelper.doesSongExist(hash)) return res.status(404).send("Song hash doesn't have a leaderboard associated with it")
 
 	await DBHelper.removeExistingScore(req.user.user_id, hash, data.instrument);
 	
@@ -161,7 +169,6 @@ app.post("/leaderboards/song/:hash/submit", requireAuthentication, async (req: A
 });
 
 const SongSubmission = Record({
-    song_hash: RString,
     title: RString,
     artist: RString, 
     album: RString,
@@ -177,15 +184,16 @@ const SongSubmission = Record({
     song_length: RNumber
 });
 
-app.post("/leaderboards/create", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
+app.post("/leaderboards/song/:hash/create", requireAuthentication, async (req: AuthorizedRequest, res: Response) => {
     if(typeof req.body !== "object" || !SongSubmission.validate(req.body).success) return res.sendStatus(400);
     let data = SongSubmission.check(req.body);
+    let hash = req.params.hash;
 
-    if(blacklist.includes(data.song_hash)) return res.status(403).send("That song is blacklisted.");
+    if(blacklist.includes(hash)) return res.status(403).send("That song is blacklisted.");
     if(!req.user) return res.sendStatus(400);
-    if(await DBHelper.doesSongHaveLeaderboard(data.song_hash)) return res.status(409).send("Leaderboard already exists.");
+    if(await DBHelper.doesSongExist(hash)) return res.status(409).send("Leaderboard already exists.");
 
-    let toSubmit = data;
+    let toSubmit = {...data, song_hash: hash};
     let success = await DBHelper.createSong(toSubmit);
 
     if(success) res.sendStatus(200); else res.sendStatus(520);

@@ -111,68 +111,67 @@ export class DatabaseHelper {
             });
         }
     }
-    getUserByDiscordId(id: string): Promise<User | null> {
+    private queryUser(query: string, params: any): Promise<User | null> {
         return new Promise((res) => {
-            let resolved = false;
-            this.db.each("SELECT * FROM Users WHERE discord_id = ?", id, (err, row: User) => {
-                res(row);
-                resolved = true;
-            }, () => {if(!resolved) res(null)});
+            this.db.wait( () => {
+                let resolved = false;
+                this.db.each(query, params, (err, row: User) => {
+                    res(row);
+                    resolved = true;
+                }, () => {if(!resolved) res(null)});
+            });
         });
+    }
+    getUserByDiscordId(id: string): Promise<User | null> {
+        return this.queryUser("SELECT * FROM Users WHERE discord_id = ?", id);
     };
     getUserByUserId(id: number): Promise<User | null> {
-        return new Promise((res) => {
-            let resolved = false;
-            this.db.each("SELECT * FROM Users WHERE user_id = ?", id, (err, row: User) => {
-                res(row);
-                resolved = true;
-            }, () => {if(!resolved) res(null)});
-        });
+        return this.queryUser("SELECT * FROM Users WHERE user_id = ?", id);
     };
     getUserByAuthKey(auth_key: string): Promise<User | null> {
-        return new Promise((res) => {
-            let resolved = false;
-            this.db.each("SELECT * FROM Users WHERE auth_key = ?", auth_key, (err, row: User) => {
-                res(row);
-                resolved = true;
-            }, () => {if(!resolved) res(null)});
-        });
+        return this.queryUser("SELECT * FROM Users WHERE auth_key = ?", auth_key);
     }
     addUser(discord_id: string, username: string, display_name: string, auth_key: string): Promise<boolean>{
         return new Promise((res) => {
-            this.db.run(`INSERT INTO Users ("discord_id", "username", "display_name", "auth_key") VALUES (?, ?, ?, ?)`, [discord_id, username, display_name, auth_key], (err) => {
-                if(!err) res(true); else res(false);
-            })
+            this.db.wait( () => {
+                this.db.run(`INSERT INTO Users ("discord_id", "username", "display_name", "auth_key") VALUES (?, ?, ?, ?)`, [discord_id, username, display_name, auth_key], (err) => {
+                    if(!err) res(true); else res(false);
+                })
+            });
         })
     }
     getScores(song_hash: string, instrument: string, page = 1): Promise<Score[]> {
         return new Promise( (res) => {
-            let items: Score[] = [];
-            this.db.each(
-                `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY score DESC LIMIT 10 OFFSET ?`, 
-                [song_hash, instrument, (page - 1) * 10],
-                (err, score: Score) => {
-                    items.push(score);
-                },
-                () => {
-                    res(items)
-                }
-            )
+            this.db.wait( () => {
+                let items: Score[] = [];
+                this.db.each(
+                    `SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY score DESC LIMIT 10 OFFSET ?`, 
+                    [song_hash, instrument, (page - 1) * 10],
+                    (err, score: Score) => {
+                        items.push(score);
+                    },
+                    () => {
+                        res(items)
+                    }
+                )
+            });
         });
     }
     getScoreCount(song_hash: string, instrument: string): Promise<number> {
         return new Promise( (res) => {
-            let total = 0;
-            this.db.each(
-                `SELECT NULL FROM Scores WHERE song_hash = ? AND instrument = ?`,
-                [song_hash, instrument],
-                (err) => {
-                    total++;
-                },
-                () => {
-                    res(total);
-                }
-            )
+            this.db.wait( () => {
+                let total = 0;
+                this.db.each(
+                    `SELECT NULL FROM Scores WHERE song_hash = ? AND instrument = ?`,
+                    [song_hash, instrument],
+                    (err) => {
+                        total++;
+                    },
+                    () => {
+                        res(total);
+                    }
+                )
+            });
         })
     }
     doesSongExist(song_hash: string): Promise<boolean> {
@@ -192,44 +191,52 @@ export class DatabaseHelper {
     }
     createSong(data: Song): Promise<boolean> {
         return new Promise( (res) => {
-            this.db.run(
-                `INSERT INTO Songs ("song_hash","title","artist","album","charters","source","diff_drums","diff_bass","diff_guitar","diff_vocals","diff_plastic_drums","diff_plastic_bass","diff_plastic_guitar","song_length") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [data.song_hash, data.title, data.artist, data.album, data.charters, data.source, data.diff_drums, data.diff_bass, data.diff_guitar, data.diff_vocals, data.diff_plastic_drums, data.diff_plastic_bass, data.diff_plastic_guitar, data.song_length],
-                (err) => {
-                    if(!err) res(true); else res(false);
-                }
-            )
-        })
+            this.db.wait( () => {
+                this.db.run(
+                    `INSERT INTO Songs ("song_hash","title","artist","album","charters","source","diff_drums","diff_bass","diff_guitar","diff_vocals","diff_plastic_drums","diff_plastic_bass","diff_plastic_guitar","song_length") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.song_hash, data.title, data.artist, data.album, data.charters, data.source, data.diff_drums, data.diff_bass, data.diff_guitar, data.diff_vocals, data.diff_plastic_drums, data.diff_plastic_bass, data.diff_plastic_guitar, data.song_length],
+                    (err) => {
+                        if(!err) res(true); else res(false);
+                    }
+                )
+            });
+        });
     }
     submitLeaderboardScore(data: ScoreSubmission, user_id: number): Promise<boolean> {
         let uuid = crypto.randomUUID();
         return new Promise( (res) => {
-            this.db.run(`INSERT INTO Scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-                [uuid, user_id, data.song_hash, data.instrument, data.score, data.note_count, data.notes_hit_perfect, data.notes_hit_good, data.misses, data.strikes, data.difficulty],
-                (err) => {if(err) res(false); else res(true);}
-            )
-        })
+            this.db.wait( () => {
+                this.db.run(`INSERT INTO Scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                    [uuid, user_id, data.song_hash, data.instrument, data.score, data.note_count, data.notes_hit_perfect, data.notes_hit_good, data.misses, data.strikes, data.difficulty],
+                    (err) => {if(err) res(false); else res(true);}
+                )
+            });
+        });
     }
     removeExistingScore(user_id: number, song_hash: string, instrument: string): Promise<boolean> {
         return new Promise( (res) => {
-            this.db.run(`DELETE FROM Scores WHERE user_id = ? AND song_hash = ? AND instrument = ?`,
-                [user_id, song_hash, instrument],
-                (err) => {if(err) res(false); else res(true);}
-            );
+            this.db.wait( () => {
+                this.db.run(`DELETE FROM Scores WHERE user_id = ? AND song_hash = ? AND instrument = ?`,
+                    [user_id, song_hash, instrument],
+                    (err) => {if(err) res(false); else res(true);}
+                );
+            });
         })
     }
     async getUserScoreAndPosition(user_id: number, song_hash: string, instrument: string){
         let songLeaderboard: Score[] = await new Promise( (res) => {
-            let lb: Score[] = [];
-            this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY Score DESC`,
-                [song_hash, instrument],
-                (err, score: Score) => {
-                    lb.push(score);
-                },
-                () => {
-                    res(lb);
-                }
-            )
+            this.db.wait( () => {
+                let lb: Score[] = [];
+                this.db.each(`SELECT * FROM Scores WHERE song_hash = ? AND instrument = ? ORDER BY Score DESC`,
+                    [song_hash, instrument],
+                    (err, score: Score) => {
+                        lb.push(score);
+                    },
+                    () => {
+                        res(lb);
+                    }
+                )
+            });
         });
         let pos = songLeaderboard.map( (s) => s.user_id ).indexOf(user_id);
 
@@ -240,12 +247,14 @@ export class DatabaseHelper {
     }
     getAllSongs(): Promise<Song[]> {
         return new Promise( (res) => {
-            let songs: Song[] = [];
-            this.db.each(`SELECT * FROM Songs`, (err, song: Song) => {
-                songs.push(song);
-            }, () => {
-                res(songs);
-            })
+            this.db.wait( () => {
+                let songs: Song[] = [];
+                this.db.each(`SELECT * FROM Songs`, (err, song: Song) => {
+                    songs.push(song);
+                }, () => {
+                    res(songs);
+                })
+            });
         })
     }
 }

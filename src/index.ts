@@ -21,7 +21,7 @@ const requireAuthentication: RequestHandler = async (req: AuthorizedRequest, res
     let apikey = req.headers?.authorization;
     if(!apikey) return res.status(400).send("Missing authorization header. (must be your API key encoded in base64)");
     
-    let decoded = Buffer.from(apikey.replace("Bearer  ", ""), "base64").toString();
+    let decoded = apikey.replace("Bearer ", "");
     let user = await DBHelper.getUserByAuthKey(decoded);
 
     if(!user) return res.status(401).send("Invalid authorization header. (must be a valid API key encoded in base64)");
